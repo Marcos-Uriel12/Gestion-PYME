@@ -9,7 +9,7 @@ from app.models.products import Product
 from app.models.precios import Precio
 from app.models.clientes import Cliente
 from datetime import datetime, timezone
-
+from app.tasks import enviar_email_pedido, update_pedido
 
 router = APIRouter(prefix="/pedidos", tags=["pedidos"])
 
@@ -52,6 +52,9 @@ def create_pedido(pedido: PedidoCreate, db: Session = Depends(get_db), current_u
             db.query(Product).filter(Product.id == item.producto_id).first().stock -= item.cantidad
         
         db.commit()
+    
+    #envio del mail
+    enviar_email_pedido.delay(cliente.email, db_pedido.id, db_item.producto_id, db_item.cantidad, db_item.precio_unitario, db_pedido.estado, db_pedido.fecha_pedido)
 
     return db_pedido
 
@@ -76,4 +79,7 @@ def update_pedido(id: int, pedido: PedidoUpdate, db: Session = Depends(get_db), 
     db_pedido.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(db_pedido)
+
+    #envio del mail
+    update_pedido.delay(db_pedido.id, db_pedido.estado)
     return db_pedido

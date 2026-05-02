@@ -29,7 +29,7 @@ class PedidoCreate(BaseModel):
 
 class PedidoUpdate(BaseModel):
     estado: Literal["pendiente", "en_proceso", "enviado", "entregado", "cancelado"]
-    metodo_pago: str
+    metodo_pago: Optional[str] = None
 
 class PedidoResponse(BaseModel):
     id: int

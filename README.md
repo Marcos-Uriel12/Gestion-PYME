@@ -1,41 +1,45 @@
-# API REST - Gestión PYME
+# API REST — Gestión PYME
 
-API REST para la gestión integral de una pequeña o mediana empresa (PYME) orientada a la venta de productos (muebles u otros artículos con medidas y unidades de medida). El sistema centraliza todas las operaciones del negocio en un solo backend:
+API REST para la gestión integral de una PYME orientada a la venta de productos, con catálogo, clientes, pedidos, precios duales por zona y notificaciones por email.
 
-- **Catálogo de productos**: cada producto tiene nombre, stock, unidad de medida, medidas opcionales, tipo de mueble y categoría. El stock se descuenta automáticamente al confirmar un pedido.
+## Demo
 
-- **Gestión de clientes**: los clientes se registran con datos de contacto (email, teléfono, dirección, ciudad, código postal) y se clasifican por zona geográfica (**Buenos Aires** o **Interior**), lo que determina qué precio se les aplica en cada pedido.
+🚀 Ver demo en Railway: <!-- agregar link -->
 
-- **Precios duales por zona**: cada producto tiene dos precios vigentes almacenados históricamente — `precio_BA` para clientes de Buenos Aires y `precio_interior` para el resto del país. El sistema siempre toma el precio más reciente al momento de crear el pedido.
+---
 
-- **Pedidos con ítems múltiples**: un pedido puede contener varios productos a la vez. Cada ítem registra la cantidad y el precio unitario aplicado según la zona del cliente. El pedido pasa por estados (`pendiente → en_proceso → enviado → entregado / cancelado`) y registra el método de pago.
+## Tech Stack
 
-- **Autenticación con JWT**: todos los endpoints de negocio están protegidos. Un usuario debe registrarse y hacer login para obtener un token de acceso con expiración de 30 minutos.
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?style=flat&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat&logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat&logo=postgresql&logoColor=white)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-D71F00?style=flat&logo=sqlalchemy&logoColor=white)
+![Alembic](https://img.shields.io/badge/Alembic-migrations-6BA81E?style=flat)
+![Celery](https://img.shields.io/badge/Celery-5.x-37814A?style=flat&logo=celery&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-broker-DC382D?style=flat&logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white)
+![JWT](https://img.shields.io/badge/JWT-auth-000000?style=flat&logo=jsonwebtokens&logoColor=white)
 
-- **Historial y auditoría**: todos los modelos registran `created_at` y `updated_at` para trazabilidad completa de cambios.
+---
 
-## Stack
+## Features
 
-- **FastAPI** — framework web
-- **PostgreSQL** — base de datos
-- **SQLAlchemy 2.0** — ORM
-- **Alembic** — migraciones
-- **JWT (jose)** — autenticación
-- **Docker Compose** — base de datos local
-- **Python 3.13**
+- **Autenticación JWT** — registro y login con tokens Bearer de 30 min de expiración.
+- **Catálogo de productos** — CRUD con stock, unidad de medida, medidas opcionales y categoría. El stock se descuenta automáticamente al confirmar un pedido.
+- **Gestión de clientes** — datos de contacto completos y clasificación por zona geográfica (Buenos Aires / Interior).
+- **Pedidos con ítems múltiples** — cada pedido agrupa varios productos y fluye por estados: `pendiente → en_proceso → enviado → entregado / cancelado`.
+- **Precios duales con historial** — cada producto tiene `precio_BA` y `precio_interior`. El sistema aplica el precio vigente al momento de crear el pedido y conserva el historial completo.
+- **Notificaciones por email con Celery** — al crear un pedido o cambiar su estado, se envía un email automático al cliente de forma asíncrona via Redis + Celery.
 
-## Módulos
+---
 
-| Prefijo | Descripción |
-|---|---|
-| `/auth` | Registro y login de usuarios |
-| `/categorias` | CRUD de categorías de productos |
-| `/productos` | CRUD de productos con stock |
-| `/clientes` | CRUD de clientes |
-| `/precios` | Precios por producto (BA vs Interior) |
-| `/pedidos` | Pedidos con descuento automático de stock |
+## Levantar localmente
 
-## Instalación
+### Requisitos
+
+- Python 3.13
+- Docker y Docker Compose
+- Redis (levantado con Docker, ver más abajo)
 
 ### 1. Clonar el repositorio
 
@@ -58,24 +62,27 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Configurar variables de entorno
+### 3. Variables de entorno
 
-Crear un archivo `.env` en la raíz del proyecto:
+Crear un archivo `.env` en la raíz:
 
 ```env
 DATABASE_URL=postgresql+psycopg2://marcos:marcos123@localhost:5432/pyme_db
 SECRET_KEY=unaclavesecretamuylargarandom123456
+REDIS_URL=redis://localhost:6379/0
+EMAIL=tu_email@gmail.com
+EMAIL_PASSWORD=tu_app_password
 ```
 
-> Cambiar `SECRET_KEY` por un valor seguro en producción.
+> Para `EMAIL_PASSWORD` usá una App Password de Google (no tu contraseña real).
 
-### 4. Levantar la base de datos con Docker
+### 4. Levantar servicios con Docker Compose
 
 ```bash
 docker-compose up -d
 ```
 
-Esto levanta un contenedor PostgreSQL en el puerto `5432`.
+Levanta PostgreSQL en el puerto `5432` y Redis en el `6379`.
 
 ### 5. Ejecutar migraciones
 
@@ -89,24 +96,27 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-La API estará disponible en `http://localhost:8000`.
+API disponible en `http://localhost:8000`  
+Docs interactivos: `http://localhost:8000/docs`
 
-Documentación interactiva: `http://localhost:8000/docs`
+### 7. Iniciar el worker de Celery
 
-## Autenticación
+En una terminal separada (con el venv activado):
 
-Los endpoints protegidos requieren un token JWT tipo Bearer.
-
-1. Registrar usuario: `POST /auth/register`
-2. Obtener token: `POST /auth/login` (con `username` y `password` en form-data)
-3. Incluir en el header: `Authorization: Bearer <token>`
-
-## Estructura del proyecto
-
+```bash
+celery -A app.celery_app worker --loglevel=info
 ```
+
+---
+
+## Estructura de carpetas
+
+```text
 proyecto_taller/
 ├── app/
 │   ├── main.py
+│   ├── celery_app.py
+│   ├── tasks.py
 │   ├── database/
 │   │   └── database.py
 │   ├── models/
@@ -131,9 +141,3 @@ proyecto_taller/
 ├── requirements.txt
 └── .env
 ```
-
-## Lógica de precios
-
-Al crear un pedido, el precio unitario se asigna automáticamente según la zona del cliente:
-- **Buenos Aires** → `precio_BA`
-- **Interior** → `precio_interior`
